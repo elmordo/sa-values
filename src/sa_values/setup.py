@@ -19,35 +19,25 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from sqlalchemy import Column, Integer, MetaData, String, Table
+from sqlalchemy import Connection
+from sqlalchemy.sql.ddl import CreateTable, DropTable
+
+from .table import get_value_table
 
 
-metadata = MetaData()
-
-_value_table = None
-
-
-def get_value_table() -> Table:
-    """Get the value table. If the table instance does not exists, create it"""
-    global _value_table
-
-    if _value_table is None:
-        _value_table = _create_value_table()
-    return _value_table
+def setup_sa_values(connection: Connection) -> None:
+    _create_table(connection)
 
 
-def setup_value_table(table_name: str = "sa_values") -> None:
-    """Create the value table with the given name"""
-    global _value_table
-    _value_table = _create_value_table(table_name)
+def teardown_sa_values(connection: Connection) -> None:
+    _drop_table(connection)
 
 
-def _create_value_table(table_name: str = "sa_values") -> Table:
-    """Create and return the value table with the given name."""
-    return Table(
-        table_name,
-        metadata,
-        Column("id", Integer, primary_key=True),
-        Column("name", String, nullable=False),
-        Column("value", String, nullable=False),
-    )
+def _create_table(connection: Connection) -> None:
+    create_stmt = CreateTable(get_value_table(), if_not_exists=True)
+    connection.execute(create_stmt)
+
+
+def _drop_table(connection: Connection) -> None:
+    stmt = DropTable(get_value_table(), if_exists=True)
+    connection.execute(stmt)

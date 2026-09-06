@@ -23,9 +23,9 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from sqlalchemy import Connection, delete, insert, select, update
+from sqlalchemy import Connection, delete, insert, select, Table, update
 
-from .table import configuration_value
+from .table import get_value_table
 
 
 class Values:
@@ -43,13 +43,14 @@ class Values:
 
     def __init__(self, connection: Connection):
         self.connection: Connection = connection
+        self._value_table = get_value_table()
 
     def get(self, key: str) -> str | None:
         """Return the oldest value by row ID, or None if the key is absent."""
         stmt = (
-            select(configuration_value.c.value)
-            .where(configuration_value.c.name == key)
-            .order_by(configuration_value.c.id)
+            select(self._value_table.c.value)
+            .where(self._value_table.c.name == key)
+            .order_by(self._value_table.c.id)
             .limit(1)
         )
         return self.connection.scalar(stmt)
@@ -57,35 +58,35 @@ class Values:
     def get_keys(self) -> list[str]:
         """Return all keys."""
         stmt = (
-            select(configuration_value.c.name)
+            select(self._value_table.c.name)
             .distinct()
-            .order_by(configuration_value.c.name)
+            .order_by(self._value_table.c.name)
         )
         return list(self.connection.scalars(stmt))
 
     def set(self, key: str, value: str) -> None:
         """Store exactly one value for the key, replacing any existing values."""
         stmt = (
-            select(configuration_value.c.id)
-            .where(configuration_value.c.name == key)
-            .order_by(configuration_value.c.id)
+            select(self._value_table.c.id)
+            .where(self._value_table.c.name == key)
+            .order_by(self._value_table.c.id)
         )
         item_ids = list(self.connection.scalars(stmt))
         if item_ids:
             self.connection.execute(
-                update(configuration_value)
-                .where(configuration_value.c.id == item_ids[0])
+                update(self._value_table)
+                .where(self._value_table.c.id == item_ids[0])
                 .values(value=value),
             )
             if len(item_ids) > 1:
                 self.connection.execute(
-                    delete(configuration_value).where(
-                        configuration_value.c.id.in_(item_ids[1:])
+                    delete(self._value_table).where(
+                        self._value_table.c.id.in_(item_ids[1:])
                     ),
                 )
         else:
             self.connection.execute(
-                insert(configuration_value).values(name=key, value=value)
+                insert(self._value_table).values(name=key, value=value)
             )
 
     def has(self, key: str) -> bool:
@@ -98,7 +99,7 @@ class Values:
 
     def multi_value_key(self, key: str) -> MultiValueKey:
         """Return an accessor sharing this session, without creating any rows."""
-        return MultiValueKey(self.connection, key)
+        return MultiValueKey(self.connection, self._value_table, key)
 
 
 class MultiValueKey:
@@ -116,9 +117,10 @@ class MultiValueKey:
     in oldest-row order. Mutations flush, leaving transaction control to the caller.
     """
 
-    def __init__(self, connection: Connection, key: str):
+    def __init__(self, connection: Connection, value_table: Table, key: str):
         self.connection = connection
         self.key = key
+        self._value_table = value_table
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.get_all())
@@ -126,19 +128,19 @@ class MultiValueKey:
     def get_all(self) -> list[str]:
         """Return distinct values in oldest-row order, or an empty list."""
         stmt = (
-            select(configuration_value.c.value)
-            .where(configuration_value.c.name == self.key)
-            .order_by(configuration_value.c.id)
+            select(self._value_table.c.value)
+            .where(self._value_table.c.name == self.key)
+            .order_by(self._value_table.c.id)
         )
         return list(dict.fromkeys(self.connection.scalars(stmt)))
 
     def get(self, value: str) -> str | None:
         """Return the matching string, or None if it is absent."""
         stmt = (
-            select(configuration_value.c.value)
+            select(self._value_table.c.value)
             .where(
-                configuration_value.c.name == self.key,
-                configuration_value.c.value == value,
+                self._value_table.c.name == self.key,
+                self._value_table.c.value == value,
             )
             .limit(1)
         )
@@ -152,20 +154,20 @@ class MultiValueKey:
         """Add the value if absent, leaving other values intact."""
         if not self.has(value):
             self.connection.execute(
-                insert(configuration_value).values(name=self.key, value=value)
+                insert(self._value_table).values(name=self.key, value=value)
             )
 
     def delete(self, value: str) -> None:
         """Remove every matching row; missing values are ignored."""
         self.connection.execute(
-            delete(configuration_value).where(
-                configuration_value.c.name == self.key,
-                configuration_value.c.value == value,
+            delete(self._value_table).where(
+                self._value_table.c.name == self.key,
+                self._value_table.c.value == value,
             ),
         )
 
     def clear(self) -> None:
         """Remove all values for this key; missing keys are ignored."""
         self.connection.execute(
-            delete(configuration_value).where(configuration_value.c.name == self.key)
+            delete(self._value_table).where(self._value_table.c.name == self.key)
         )
