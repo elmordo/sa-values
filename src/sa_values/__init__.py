@@ -19,17 +19,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from sqlalchemy import Connection, select, Table, Column, Integer, String, MetaData, insert, delete, update
+from __future__ import annotations
 
-metadata = MetaData()
+from collections.abc import Iterator
 
-configuration_value = Table(
-    "configuration_values",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("name", String, nullable=False),
-    Column("value", String, nullable=False),
-)
+from sqlalchemy import Connection, delete, insert, select, update
+
+from .table import configuration_value
 
 
 class ConfigurationValues:
@@ -61,7 +57,11 @@ class ConfigurationValues:
 
     def get_keys(self) -> list[str]:
         """Return all keys."""
-        stmt = select(configuration_value.c.name).distinct().order_by(configuration_value.c.name)
+        stmt = (
+            select(configuration_value.c.name)
+            .distinct()
+            .order_by(configuration_value.c.name)
+        )
         return list(self.connection.scalars(stmt))
 
     def set(self, key: str, value: str) -> None:
@@ -80,10 +80,14 @@ class ConfigurationValues:
             )
             if len(item_ids) > 1:
                 self.connection.execute(
-                    delete(configuration_value).where(configuration_value.c.id.in_(item_ids[1:])),
+                    delete(configuration_value).where(
+                        configuration_value.c.id.in_(item_ids[1:])
+                    ),
                 )
         else:
-            self.connection.execute(insert(configuration_value).values(name=key, value=value))
+            self.connection.execute(
+                insert(configuration_value).values(name=key, value=value)
+            )
 
     def has(self, key: str) -> bool:
         """Return whether the key has any stored values."""
@@ -133,7 +137,10 @@ class MultiValueKey:
         """Return the matching string, or None if it is absent."""
         stmt = (
             select(configuration_value.c.value)
-            .where(configuration_value.c.name == self.key, configuration_value.c.value == value)
+            .where(
+                configuration_value.c.name == self.key,
+                configuration_value.c.value == value,
+            )
             .limit(1)
         )
         return self.connection.scalar(stmt)
@@ -145,16 +152,21 @@ class MultiValueKey:
     def set(self, value: str) -> None:
         """Add the value if absent, leaving other values intact."""
         if not self.has(value):
-            self.connection.execute(insert(configuration_value).values(name=self.key, value=value))
+            self.connection.execute(
+                insert(configuration_value).values(name=self.key, value=value)
+            )
 
     def delete(self, value: str) -> None:
         """Remove every matching row; missing values are ignored."""
         self.connection.execute(
             delete(configuration_value).where(
-                configuration_value.c.name == self.key, configuration_value.c.value == value,
+                configuration_value.c.name == self.key,
+                configuration_value.c.value == value,
             ),
         )
 
     def clear(self) -> None:
         """Remove all values for this key; missing keys are ignored."""
-        self.connection.execute(delete(configuration_value).where(configuration_value.c.name == self.key))
+        self.connection.execute(
+            delete(configuration_value).where(configuration_value.c.name == self.key)
+        )
