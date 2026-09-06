@@ -23,10 +23,24 @@ from sqlalchemy import Connection
 from sqlalchemy.sql.ddl import CreateTable, DropTable
 
 from .table import get_value_table
+from .values import Values
+
+
+_TABLE_VERSION = 1
 
 
 def setup_sa_values(connection: Connection) -> None:
     _create_table(connection)
+
+    values = Values(connection)
+    values._allow_empty = True
+
+    if not values.has(""):
+        values.set("", str(_TABLE_VERSION))
+    else:
+        current_version = int(values.get(""))
+        if current_version != _TABLE_VERSION:
+            raise ValueError(f"Invalid table version: {current_version}")
 
 
 def teardown_sa_values(connection: Connection) -> None:
