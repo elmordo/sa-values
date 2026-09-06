@@ -44,6 +44,7 @@ class Values:
     def __init__(self, connection: Connection):
         self.connection: Connection = connection
         self._value_table = get_value_table()
+        self._allow_empty = False
 
     def get(self, key: str) -> str | None:
         """Return the oldest value by row ID, or None if the key is absent."""
@@ -66,6 +67,8 @@ class Values:
 
     def set(self, key: str, value: str) -> None:
         """Store exactly one value for the key, replacing any existing values."""
+        if not key and not self._allow_empty:
+            raise ValueError("key must be non-empty")
         stmt = (
             select(self._value_table.c.id)
             .where(self._value_table.c.name == key)
@@ -118,6 +121,8 @@ class MultiValueKey:
     """
 
     def __init__(self, connection: Connection, value_table: Table, key: str):
+        if not key:
+            raise ValueError("key must be non-empty")
         self.connection = connection
         self.key = key
         self._value_table = value_table
