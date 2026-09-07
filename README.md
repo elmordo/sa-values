@@ -1,3 +1,5 @@
+[![Tests](https://github.com/elmordo/sa-values/actions/workflows/tests.yml/badge.svg)](https://github.com/elmordo/sa-values/actions/workflows/tests.yml)
+
 The `sa-values` (SQLAlchemy values) is designed as light-weight library for storing key-value pairs in database.
 
 # Installation
