@@ -28,7 +28,7 @@ from sqlalchemy import Connection, delete, insert, select, Table, update
 from .table import get_value_table
 
 
-class Values:
+class SaValues:
     """
     Features:
 

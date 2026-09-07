@@ -27,7 +27,7 @@ from sqlalchemy.sql.ddl import CreateTable, DropTable
 from sa_values.table import setup_value_table
 
 from .table import get_value_table
-from .values import Values
+from .values import SaValues
 
 
 _TABLE_VERSION = 1
@@ -41,7 +41,7 @@ def setup_sa_values(
 
     _create_table(connection)
 
-    values = Values(connection)
+    values = SaValues(connection)
     values._allow_empty = True
 
     if not values.has(""):
