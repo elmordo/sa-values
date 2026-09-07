@@ -19,3 +19,117 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+import pytest
+from sqlalchemy import func, insert, select
+
+from sa_values.table import get_value_table
+
+
+def test_getting_accessor_does_not_create_a_value(value_manager, db_connection) -> None:
+    """Test creating an accessor for an unused key; expect no row to be added."""
+    value_manager.multi_value_key("colors")
+
+    table = get_value_table()
+    row_count = db_connection.scalar(
+        select(func.count()).select_from(table).where(table.c.name == "colors")
+    )
+    assert row_count == 0
+
+
+def test_set_get_has_and_iteration_preserve_insertion_order(value_manager) -> None:
+    """Test three values added to an unused key; expect lookup, presence, and iteration in insertion order."""
+    colors = value_manager.multi_value_key("colors")
+    colors.set("blue")
+    colors.set("green")
+    colors.set("red")
+
+    assert colors.get("green") == "green"
+    assert colors.get("missing") is None
+    assert colors.has("red")
+    assert not colors.has("missing")
+    assert colors.get_all() == ["blue", "green", "red"]
+
+
+def test_repeated_set_does_not_insert_duplicates(value_manager, db_connection) -> None:
+    """Test adding the same value twice to an unused key; expect one row and one returned value."""
+    colors = value_manager.multi_value_key("colors")
+
+    colors.set("blue")
+    colors.set("blue")
+
+    table = get_value_table()
+    row_count = db_connection.scalar(
+        select(func.count())
+        .select_from(table)
+        .where(table.c.name == "colors", table.c.value == "blue")
+    )
+    assert row_count == 1
+    assert colors.get_all() == ["blue"]
+
+
+def test_get_all_suppresses_existing_duplicate_rows(
+    value_manager, db_connection
+) -> None:
+    """Test reading a key seeded with duplicate rows; expect distinct values in their oldest-row order."""
+    table = get_value_table()
+    db_connection.execute(
+        insert(table),
+        [
+            {"name": "colors", "value": "blue"},
+            {"name": "colors", "value": "green"},
+            {"name": "colors", "value": "blue"},
+        ],
+    )
+
+    assert value_manager.multi_value_key("colors").get_all() == ["blue", "green"]
+
+
+def test_delete_removes_every_matching_row(value_manager, db_connection) -> None:
+    """Test deleting a duplicated value from seeded rows; expect every matching row removed and other values kept."""
+    table = get_value_table()
+    db_connection.execute(
+        insert(table),
+        [
+            {"name": "colors", "value": "blue"},
+            {"name": "colors", "value": "blue"},
+            {"name": "colors", "value": "green"},
+        ],
+    )
+    colors = value_manager.multi_value_key("colors")
+
+    colors.delete("blue")
+    colors.delete("missing")
+
+    assert colors.get_all() == ["green"]
+
+
+def test_clear_only_removes_values_for_its_key(value_manager) -> None:
+    """Test clearing one of two populated keys; expect that key empty while the other remains unchanged."""
+    colors = value_manager.multi_value_key("colors")
+    sizes = value_manager.multi_value_key("sizes")
+    colors.set("blue")
+    colors.set("green")
+    sizes.set("large")
+
+    colors.clear()
+    colors.clear()
+
+    assert colors.get_all() == []
+    assert sizes.get_all() == ["large"]
+
+
+def test_empty_string_is_a_valid_value(value_manager) -> None:
+    """Test adding an empty string to an unused multi-value key; expect it to be stored and reported as present."""
+    values = value_manager.multi_value_key("values")
+
+    values.set("")
+
+    assert values.get("") == ""
+    assert values.has("")
+    assert values.get_all() == [""]
+
+
+def test_empty_key_is_rejected(value_manager) -> None:
+    """Test creating a multi-value accessor with an empty key; expect ValueError before any row is created."""
+    with pytest.raises(ValueError, match="key must be non-empty"):
+        value_manager.multi_value_key("")

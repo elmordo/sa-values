@@ -19,3 +19,47 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+from sqlalchemy import inspect
+
+from sa_values import SaValues, setup_sa_values, teardown_sa_values
+
+
+def test_teardown_drops_the_value_table(db_connection) -> None:
+    """Test teardown after default setup; expect the default value table to be removed."""
+    setup_sa_values(db_connection)
+
+    teardown_sa_values(db_connection)
+
+    assert "sa_values" not in inspect(db_connection).get_table_names()
+
+
+def test_teardown_is_idempotent(db_connection) -> None:
+    """Test teardown called twice after default setup; expect the second call to succeed with no table."""
+    setup_sa_values(db_connection)
+
+    teardown_sa_values(db_connection)
+    teardown_sa_values(db_connection)
+
+    assert "sa_values" not in inspect(db_connection).get_table_names()
+
+
+def test_teardown_drops_a_custom_value_table(db_connection) -> None:
+    """Test teardown after custom-table setup; expect the configured custom value table to be removed."""
+    setup_sa_values(db_connection, "application_values")
+
+    teardown_sa_values(db_connection)
+
+    assert "application_values" not in inspect(db_connection).get_table_names()
+
+
+def test_setup_can_reinstall_after_teardown(db_connection) -> None:
+    """Test setup after teardown removed a populated table; expect a fresh table with only the version row."""
+    setup_sa_values(db_connection)
+    SaValues(db_connection).set("color", "blue")
+    teardown_sa_values(db_connection)
+
+    setup_sa_values(db_connection)
+
+    values = SaValues(db_connection)
+    assert values.get("") == "1"
+    assert values.get("color") is None
