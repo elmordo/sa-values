@@ -22,7 +22,7 @@
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
 
-metadata = MetaData()
+_metadata = MetaData()
 
 _value_table = None
 
@@ -44,9 +44,12 @@ def setup_value_table(table_name: str = "sa_values") -> None:
 
 def _create_value_table(table_name: str = "sa_values") -> Table:
     """Create and return the value table with the given name."""
+    if (existing_table := _metadata.tables.get(table_name)) is not None:
+        return existing_table
+
     return Table(
         table_name,
-        metadata,
+        _metadata,
         Column("id", Integer, primary_key=True),
         Column("name", String, nullable=False),
         Column("value", String, nullable=False),
