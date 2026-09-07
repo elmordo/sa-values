@@ -39,9 +39,9 @@ def test_getting_accessor_does_not_create_a_value(value_manager, db_connection) 
 def test_set_get_has_and_iteration_preserve_insertion_order(value_manager) -> None:
     """Test three values added to an unused key; expect lookup, presence, and iteration in insertion order."""
     colors = value_manager.multi_value_key("colors")
-    colors.set("blue")
-    colors.set("green")
-    colors.set("red")
+    colors.add("blue")
+    colors.add("green")
+    colors.add("red")
 
     assert colors.get("green") == "green"
     assert colors.get("missing") is None
@@ -54,8 +54,8 @@ def test_repeated_set_does_not_insert_duplicates(value_manager, db_connection) -
     """Test adding the same value twice to an unused key; expect one row and one returned value."""
     colors = value_manager.multi_value_key("colors")
 
-    colors.set("blue")
-    colors.set("blue")
+    colors.add("blue")
+    colors.add("blue")
 
     table = get_value_table()
     row_count = db_connection.scalar(
@@ -107,9 +107,9 @@ def test_clear_only_removes_values_for_its_key(value_manager) -> None:
     """Test clearing one of two populated keys; expect that key empty while the other remains unchanged."""
     colors = value_manager.multi_value_key("colors")
     sizes = value_manager.multi_value_key("sizes")
-    colors.set("blue")
-    colors.set("green")
-    sizes.set("large")
+    colors.add("blue")
+    colors.add("green")
+    sizes.add("large")
 
     colors.clear()
     colors.clear()
@@ -122,7 +122,7 @@ def test_empty_string_is_a_valid_value(value_manager) -> None:
     """Test adding an empty string to an unused multi-value key; expect it to be stored and reported as present."""
     values = value_manager.multi_value_key("values")
 
-    values.set("")
+    values.add("")
 
     assert values.get("") == ""
     assert values.has("")

@@ -155,7 +155,7 @@ class MultiValueKey:
         """Return whether this key contains the value."""
         return self.get(value) is not None
 
-    def set(self, value: str) -> None:
+    def add(self, value: str) -> None:
         """Add the value if absent, leaving other values intact."""
         if not self.has(value):
             self.connection.execute(
