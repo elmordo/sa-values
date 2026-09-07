@@ -19,8 +19,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+from __future__ import annotations
+
 from sqlalchemy import Connection
 from sqlalchemy.sql.ddl import CreateTable, DropTable
+
+from sa_values.table import setup_value_table
 
 from .table import get_value_table
 from .values import Values
@@ -29,7 +33,12 @@ from .values import Values
 _TABLE_VERSION = 1
 
 
-def setup_sa_values(connection: Connection) -> None:
+def setup_sa_values(
+    connection: Connection, value_table_name: str | None = None
+) -> None:
+    if value_table_name is not None:
+        setup_value_table(value_table_name)
+
     _create_table(connection)
 
     values = Values(connection)

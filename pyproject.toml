@@ -18,6 +18,7 @@ test = [
   "pytest",
 ]
 dev = [
+  "sa-values[test]",
   "build",
   "twine",
 ]
