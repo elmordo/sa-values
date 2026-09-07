@@ -20,9 +20,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import pytest
-from sqlalchemy import Connection, create_engine, Engine
+from sqlalchemy import Connection, create_engine, Engine, MetaData
 
 from sa_values import SaValues, setup_sa_values
+from sa_values import table as table_module
+
+
+@pytest.fixture(autouse=True)
+def reset_value_table(monkeypatch) -> None:
+    """Give every test an independent value-table registry."""
+    monkeypatch.setattr(table_module, "_metadata", MetaData())
+    monkeypatch.setattr(table_module, "_value_table", None)
 
 
 @pytest.fixture()
@@ -35,19 +43,22 @@ def value_manager(db_connection) -> SaValues:
 @pytest.fixture()
 def db_connection(db_engine) -> Connection:
     """Connect to a database, using the engine"""
-    return db_engine.connect()
+    with db_engine.connect() as connection:
+        yield connection
 
 
 @pytest.fixture()
 def db_engine(db_uri) -> Engine:
     """Create database engine from db_url"""
-    return create_engine(db_uri)
+    engine = create_engine(db_uri)
+    yield engine
+    engine.dispose()
 
 
 @pytest.fixture(params=["sqlite"])
-def db_uri(db_type: str) -> str:
+def db_uri(request: pytest.FixtureRequest) -> str:
     """Provide database uri for various database types. (only sqlite supported for now)"""
+    db_type = request.param
     if db_type == "sqlite":
         return "sqlite:///:memory:"
-    else:
-        raise NotImplementedError
+    raise NotImplementedError
