@@ -19,35 +19,3 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-import pytest
-from sqlalchemy import Connection, create_engine, Engine
-
-from sa_values import SaValues, setup_sa_values
-
-
-@pytest.fixture()
-def value_manager(db_connection) -> SaValues:
-    """Setup the a database and create SaValues instance. The SaValues instance is returned"""
-    setup_sa_values(db_connection)
-    return SaValues(db_connection)
-
-
-@pytest.fixture()
-def db_connection(db_engine) -> Connection:
-    """Connect to a database, using the engine"""
-    return db_engine.connect()
-
-
-@pytest.fixture()
-def db_engine(db_uri) -> Engine:
-    """Create database engine from db_url"""
-    return create_engine(db_uri)
-
-
-@pytest.fixture(params=["sqlite"])
-def db_uri(db_type: str) -> str:
-    """Provide database uri for various database types. (only sqlite supported for now)"""
-    if db_type == "sqlite":
-        return "sqlite:///:memory:"
-    else:
-        raise NotImplementedError
