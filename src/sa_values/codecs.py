@@ -88,3 +88,20 @@ class JsonCodec(DataCodec):
             return json.loads(value)
         except json.JSONDecodeError as exc:
             raise DecodingError("Failed to decode value as JSON") from exc
+
+
+_default_codec = StringCodec()
+
+
+def get_default_codec() -> DataCodec:
+    """Get default codec."""
+    return _default_codec
+
+
+def set_default_codec(codec: DataCodec) -> None:
+    """Set the app-wide default codec.
+
+    The default codec is used when no codec is provided to `sa_values.values`.
+    """
+    global _default_codec
+    _default_codec = codec
