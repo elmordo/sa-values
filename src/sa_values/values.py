@@ -22,12 +22,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import Any, TypeVar
 
 from sqlalchemy import Connection, delete, insert, select, Table, update
 from sqlalchemy.exc import DBAPIError
 
 from .exceptions import StorageError
 from .table import get_value_table
+
+
+T = TypeVar("T")
 
 
 class SaValues:
@@ -48,7 +52,7 @@ class SaValues:
         self._value_table = get_value_table()
         self._allow_empty = False
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str, _type: T = object) -> T | None:
         """Return the oldest value by row ID, or None if the key is absent."""
         stmt = (
             select(self._value_table.c.value)
@@ -69,7 +73,7 @@ class SaValues:
         except DBAPIError as err:
             raise StorageError("Cannot get keys") from err
 
-    def set(self, key: str, value: str) -> None:
+    def set(self, key: str, value: Any) -> None:
         """Store exactly one value for the key, replacing any existing values."""
         if not key and not self._allow_empty:
             raise ValueError("key must be non-empty")
@@ -137,7 +141,7 @@ class MultiValueKey:
     def __iter__(self) -> Iterator[str]:
         return iter(self.get_all())
 
-    def get_all(self) -> list[str]:
+    def get_all(self, _type: T = object) -> list[T]:
         """Return distinct values in oldest-row order, or an empty list."""
         stmt = (
             select(self._value_table.c.value)
@@ -149,7 +153,7 @@ class MultiValueKey:
         except DBAPIError as err:
             raise StorageError(f"Cannot get all values of '{self.key}'") from err
 
-    def get(self, value: str) -> str | None:
+    def get(self, value: str, _type: T = object) -> T | None:
         """Return the matching string, or None if it is absent."""
         stmt = (
             select(self._value_table.c.value)
@@ -168,7 +172,7 @@ class MultiValueKey:
         """Return whether this key contains the value."""
         return self.get(value) is not None
 
-    def add(self, value: str) -> None:
+    def add(self, value: Any) -> None:
         """Add the value if absent, leaving other values intact."""
         if not self.has(value):
             try:
