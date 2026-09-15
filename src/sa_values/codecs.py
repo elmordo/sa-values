@@ -23,7 +23,7 @@ from abc import ABC, abstractmethod
 import json
 from typing import Any, TypeVar
 
-from sa_values.exceptions import DecodingError, EncodingError
+from .exceptions import DecodingError, EncodingError
 
 
 T = TypeVar("T")
@@ -47,8 +47,10 @@ class DataCodec(ABC):
         """
 
     @abstractmethod
-    def decode[T](self, value: bytes) -> T:
+    def decode(self, value: bytes, _type: T = object) -> T:
         """Decode data from the byte format.
+
+        The `type_` argument is used to help type inference of type checkers.
 
         Raises:
             `sa_values.exceptions.DecodeError`: If decoding fails.
@@ -67,7 +69,7 @@ class StringCodec(DataCodec):
         except UnicodeEncodeError as exc:
             raise EncodingError("Failed to encode value as string") from exc
 
-    def decode(self, value: bytes) -> str:
+    def decode(self, value: bytes, _type: T = str) -> str:
         try:
             return value.decode()
         except UnicodeDecodeError as exc:
@@ -83,7 +85,7 @@ class JsonCodec(DataCodec):
         except (TypeError, ValueError, UnicodeEncodeError) as exc:
             raise EncodingError("Failed to encode value as JSON") from exc
 
-    def decode[T](self, value: bytes) -> T:
+    def decode(self, value: bytes, _type: T = object) -> T:
         try:
             return json.loads(value)
         except json.JSONDecodeError as exc:
