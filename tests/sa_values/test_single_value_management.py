@@ -19,9 +19,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+from unittest.mock import patch
+
 import pytest
 from sqlalchemy import func, insert, select
+from sqlalchemy.exc import DBAPIError
 
+from sa_values.exceptions import StorageError
 from sa_values.table import get_value_table
 
 
@@ -119,3 +123,42 @@ def test_empty_key_is_rejected(value_manager) -> None:
 
     with pytest.raises(ValueError, match="key must be non-empty"):
         value_manager.multi_value_key("")
+
+
+def test_get_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test get operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "scalar",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot get value of 'color'"):
+            value_manager.get("color")
+
+
+def test_get_keys_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test get_keys operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "scalars",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot get keys"):
+            value_manager.get_keys()
+
+
+def test_set_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test set operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "scalars",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot set value of 'color'"):
+            value_manager.set("color", "blue")

@@ -19,9 +19,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+from unittest.mock import patch
+
 import pytest
 from sqlalchemy import func, insert, select
+from sqlalchemy.exc import DBAPIError
 
+from sa_values.exceptions import StorageError
 from sa_values.table import get_value_table
 
 
@@ -133,3 +137,72 @@ def test_empty_key_is_rejected(value_manager) -> None:
     """Test creating a multi-value accessor with an empty key; expect ValueError before any row is created."""
     with pytest.raises(ValueError, match="key must be non-empty"):
         value_manager.multi_value_key("")
+
+
+def test_get_all_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test get_all operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "scalars",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(
+            StorageError, match="Cannot get all values of 'colors'"
+        ):
+            value_manager.multi_value_key("colors").get_all()
+
+
+def test_get_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test get operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "scalar",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot get value of 'colors'"):
+            value_manager.multi_value_key("colors").get("blue")
+
+
+def test_add_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test add operation when DBAPIError occurs on execute; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "execute",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot add value to 'colors'"):
+            value_manager.multi_value_key("colors").add("blue")
+
+
+def test_delete_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test delete operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "execute",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(
+            StorageError, match="Cannot delete value of 'colors'"
+        ):
+            value_manager.multi_value_key("colors").delete("blue")
+
+
+def test_clear_raises_storage_error_on_dbapi_error(
+    value_manager, db_connection
+) -> None:
+    """Test clear operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "execute",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot clear values of 'colors'"):
+            value_manager.multi_value_key("colors").clear()
