@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) [YEAR] [COPYRIGHT HOLDER]
+# Copyright (c) 2026 Authors and contributors listed in the AUTHORS file
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -19,9 +19,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+from unittest.mock import patch
+
 import pytest
 from sqlalchemy import func, insert, select
+from sqlalchemy.exc import DBAPIError
 
+from sa_values.exceptions import StorageError
 from sa_values.table import get_value_table
 
 
@@ -61,23 +65,21 @@ def test_repeated_set_does_not_insert_duplicates(value_manager, db_connection) -
     row_count = db_connection.scalar(
         select(func.count())
         .select_from(table)
-        .where(table.c.name == "colors", table.c.value == "blue")
+        .where(table.c.name == "colors", table.c.value == "blue".encode())
     )
     assert row_count == 1
     assert colors.get_all() == ["blue"]
 
 
-def test_get_all_suppresses_existing_duplicate_rows(
-    value_manager, db_connection
-) -> None:
+def test_get_all_suppresses_existing_duplicate_rows(value_manager, db_connection) -> None:
     """Test reading a key seeded with duplicate rows; expect distinct values in their oldest-row order."""
     table = get_value_table()
     db_connection.execute(
         insert(table),
         [
-            {"name": "colors", "value": "blue"},
-            {"name": "colors", "value": "green"},
-            {"name": "colors", "value": "blue"},
+            {"name": "colors", "value": "blue".encode()},
+            {"name": "colors", "value": "green".encode()},
+            {"name": "colors", "value": "blue".encode()},
         ],
     )
 
@@ -90,9 +92,9 @@ def test_delete_removes_every_matching_row(value_manager, db_connection) -> None
     db_connection.execute(
         insert(table),
         [
-            {"name": "colors", "value": "blue"},
-            {"name": "colors", "value": "blue"},
-            {"name": "colors", "value": "green"},
+            {"name": "colors", "value": "blue".encode()},
+            {"name": "colors", "value": "blue".encode()},
+            {"name": "colors", "value": "green".encode()},
         ],
     )
     colors = value_manager.multi_value_key("colors")
@@ -133,3 +135,58 @@ def test_empty_key_is_rejected(value_manager) -> None:
     """Test creating a multi-value accessor with an empty key; expect ValueError before any row is created."""
     with pytest.raises(ValueError, match="key must be non-empty"):
         value_manager.multi_value_key("")
+
+
+def test_get_all_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
+    """Test get_all operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "scalars",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot get all values of 'colors'"):
+            value_manager.multi_value_key("colors").get_all()
+
+
+def test_get_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
+    """Test get operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "scalar",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot get value of 'colors'"):
+            value_manager.multi_value_key("colors").get("blue")
+
+
+def test_add_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
+    """Test add operation when DBAPIError occurs on execute; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "execute",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot add value to 'colors'"):
+            value_manager.multi_value_key("colors").add("blue")
+
+
+def test_delete_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
+    """Test delete operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "execute",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot delete value of 'colors'"):
+            value_manager.multi_value_key("colors").delete("blue")
+
+
+def test_clear_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
+    """Test clear operation when DBAPIError occurs; expect StorageError."""
+    with patch.object(
+        db_connection,
+        "execute",
+        side_effect=DBAPIError("statement", {}, Exception("db error")),
+    ):
+        with pytest.raises(StorageError, match="Cannot clear values of 'colors'"):
+            value_manager.multi_value_key("colors").clear()

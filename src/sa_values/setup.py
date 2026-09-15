@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) [YEAR] [COPYRIGHT HOLDER]
+# Copyright (c) 2026 Authors and contributors listed in the AUTHORS file
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -21,11 +21,14 @@
 # SOFTWARE.
 from __future__ import annotations
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, Executable
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.sql.ddl import CreateTable, DropTable
 
 from sa_values.table import setup_value_table
 
+from .codecs import DataCodec, set_default_codec
+from .exceptions import ConfigurationError, DecodingError, StorageError
 from .table import get_value_table
 from .values import SaValues
 
@@ -34,10 +37,25 @@ _TABLE_VERSION = 1
 
 
 def setup_sa_values(
-    connection: Connection, value_table_name: str | None = None
+    connection: Connection,
+    value_table_name: str | None = None,
+    default_codec: DataCodec | None = None,
 ) -> None:
+    """Prepare storage for the sa_values.
+
+    The function is idempotent: multiple calls on the prepared database have no effect.
+
+    If no default codec is provided, the lib-default value is used (StringCodec).
+
+    Raises:
+        StorageError: Operation fails
+        ConfigurationError: The storage table is in unsupported revision.
+    """
     if value_table_name is not None:
         setup_value_table(value_table_name)
+
+    if default_codec is not None:
+        set_default_codec(default_codec)
 
     _create_table(connection)
 
@@ -47,20 +65,52 @@ def setup_sa_values(
     if not values.has(""):
         values.set("", str(_TABLE_VERSION))
     else:
-        current_version = int(values.get(""))
+        try:
+            current_version = int(values.get(""))
+        except (ValueError, TypeError) as err:
+            raise DecodingError("Unable to decode table version") from err
         if current_version != _TABLE_VERSION:
-            raise ValueError(f"Invalid table version: {current_version}")
+            raise ConfigurationError(f"Invalid table version: {current_version}")
 
 
 def teardown_sa_values(connection: Connection) -> None:
+    """Drop the storage table.
+
+    The logic is idempotent: multiple calls on the prepared database have no effect.
+
+    Raises:
+        StorageError: Operation fails
+    """
     _drop_table(connection)
 
 
 def _create_table(connection: Connection) -> None:
+    """Create the storage table.
+
+    Raises:
+        StorageError: Operation fails
+    """
     create_stmt = CreateTable(get_value_table(), if_not_exists=True)
-    connection.execute(create_stmt)
+    _execute_ddl_statement(connection, create_stmt)
 
 
 def _drop_table(connection: Connection) -> None:
+    """Drop the storage table.
+
+    Raises:
+        StorageError: Operation fails
+    """
     stmt = DropTable(get_value_table(), if_exists=True)
-    connection.execute(stmt)
+    _execute_ddl_statement(connection, stmt)
+
+
+def _execute_ddl_statement(connection: Connection, stmt: Executable) -> None:
+    """Wrapper for DDL statement executing logic. Handling errors, etc.
+
+    Raises:
+        StorageError: Operation fails
+    """
+    try:
+        connection.execute(stmt)
+    except DBAPIError as err:
+        raise StorageError from err

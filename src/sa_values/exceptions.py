@@ -19,38 +19,31 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from sqlalchemy import Column, Integer, LargeBinary, MetaData, String, Table
 
 
-_metadata = MetaData()
-
-_value_table = None
-
-
-def get_value_table() -> Table:
-    """Get the value table. If the table instance does not exists, create it"""
-    global _value_table
-
-    if _value_table is None:
-        _value_table = _create_value_table()
-    return _value_table
+class SaValueException(Exception):
+    """Common base for all exceptions raised by the `sa_values` lib."""
 
 
-def setup_value_table(table_name: str = "sa_values") -> None:
-    """Create the value table with the given name"""
-    global _value_table
-    _value_table = _create_value_table(table_name)
+class ConfigurationError(SaValueException, ValueError):
+    """Raised when configuration is invalid."""
 
 
-def _create_value_table(table_name: str = "sa_values") -> Table:
-    """Create and return the value table with the given name."""
-    if (existing_table := _metadata.tables.get(table_name)) is not None:
-        return existing_table
+class InvalidKeyError(SaValueException, KeyError):
+    """Raised when an invalid key name is attempted to be stored"""
 
-    return Table(
-        table_name,
-        _metadata,
-        Column("id", Integer, primary_key=True),
-        Column("name", String, nullable=False),
-        Column("value", LargeBinary, nullable=False),
-    )
+
+class StorageError(SaValueException):
+    """Raised when a storage operation fails."""
+
+
+class CodecError(SaValueException, ValueError):
+    """Exception raised when codec fails to encode/decode data."""
+
+
+class EncodingError(CodecError):
+    """Exception raised when codec fails to encode data."""
+
+
+class DecodingError(CodecError):
+    """Exception raised when codec fails to decode data."""
