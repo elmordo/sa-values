@@ -65,23 +65,21 @@ def test_repeated_set_does_not_insert_duplicates(value_manager, db_connection) -
     row_count = db_connection.scalar(
         select(func.count())
         .select_from(table)
-        .where(table.c.name == "colors", table.c.value == "blue")
+        .where(table.c.name == "colors", table.c.value == "blue".encode())
     )
     assert row_count == 1
     assert colors.get_all() == ["blue"]
 
 
-def test_get_all_suppresses_existing_duplicate_rows(
-    value_manager, db_connection
-) -> None:
+def test_get_all_suppresses_existing_duplicate_rows(value_manager, db_connection) -> None:
     """Test reading a key seeded with duplicate rows; expect distinct values in their oldest-row order."""
     table = get_value_table()
     db_connection.execute(
         insert(table),
         [
-            {"name": "colors", "value": "blue"},
-            {"name": "colors", "value": "green"},
-            {"name": "colors", "value": "blue"},
+            {"name": "colors", "value": "blue".encode()},
+            {"name": "colors", "value": "green".encode()},
+            {"name": "colors", "value": "blue".encode()},
         ],
     )
 
@@ -94,9 +92,9 @@ def test_delete_removes_every_matching_row(value_manager, db_connection) -> None
     db_connection.execute(
         insert(table),
         [
-            {"name": "colors", "value": "blue"},
-            {"name": "colors", "value": "blue"},
-            {"name": "colors", "value": "green"},
+            {"name": "colors", "value": "blue".encode()},
+            {"name": "colors", "value": "blue".encode()},
+            {"name": "colors", "value": "green".encode()},
         ],
     )
     colors = value_manager.multi_value_key("colors")
@@ -139,24 +137,18 @@ def test_empty_key_is_rejected(value_manager) -> None:
         value_manager.multi_value_key("")
 
 
-def test_get_all_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_get_all_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test get_all operation when DBAPIError occurs; expect StorageError."""
     with patch.object(
         db_connection,
         "scalars",
         side_effect=DBAPIError("statement", {}, Exception("db error")),
     ):
-        with pytest.raises(
-            StorageError, match="Cannot get all values of 'colors'"
-        ):
+        with pytest.raises(StorageError, match="Cannot get all values of 'colors'"):
             value_manager.multi_value_key("colors").get_all()
 
 
-def test_get_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_get_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test get operation when DBAPIError occurs; expect StorageError."""
     with patch.object(
         db_connection,
@@ -167,9 +159,7 @@ def test_get_raises_storage_error_on_dbapi_error(
             value_manager.multi_value_key("colors").get("blue")
 
 
-def test_add_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_add_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test add operation when DBAPIError occurs on execute; expect StorageError."""
     with patch.object(
         db_connection,
@@ -180,24 +170,18 @@ def test_add_raises_storage_error_on_dbapi_error(
             value_manager.multi_value_key("colors").add("blue")
 
 
-def test_delete_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_delete_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test delete operation when DBAPIError occurs; expect StorageError."""
     with patch.object(
         db_connection,
         "execute",
         side_effect=DBAPIError("statement", {}, Exception("db error")),
     ):
-        with pytest.raises(
-            StorageError, match="Cannot delete value of 'colors'"
-        ):
+        with pytest.raises(StorageError, match="Cannot delete value of 'colors'"):
             value_manager.multi_value_key("colors").delete("blue")
 
 
-def test_clear_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_clear_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test clear operation when DBAPIError occurs; expect StorageError."""
     with patch.object(
         db_connection,

@@ -59,23 +59,18 @@ def test_set_replaces_existing_values(value_manager, db_connection) -> None:
     assert row_count == 1
 
 
-def test_set_keeps_oldest_row_when_cleaning_duplicates(
-    value_manager, db_connection
-) -> None:
+def test_set_keeps_oldest_row_when_cleaning_duplicates(value_manager, db_connection) -> None:
     """Test replacing duplicate rows directly seeded for a key; expect the oldest row retained with the new value."""
     table = get_value_table()
     db_connection.execute(
         insert(table),
         [
-            {"name": "color", "value": "blue"},
-            {"name": "color", "value": "green"},
+            {"name": "color", "value": "blue".encode()},
+            {"name": "color", "value": "green".encode()},
         ],
     )
     oldest_id = db_connection.scalar(
-        select(table.c.id)
-        .where(table.c.name == "color")
-        .order_by(table.c.id)
-        .limit(1)
+        select(table.c.id).where(table.c.name == "color").order_by(table.c.id).limit(1)
     )
 
     value_manager.set("color", "red")
@@ -83,7 +78,7 @@ def test_set_keeps_oldest_row_when_cleaning_duplicates(
     rows = db_connection.execute(
         select(table.c.id, table.c.value).where(table.c.name == "color")
     ).all()
-    assert rows == [(oldest_id, "red")]
+    assert rows == [(oldest_id, "red".encode())]
 
 
 def test_get_keys_returns_distinct_sorted_keys(value_manager) -> None:
@@ -125,9 +120,7 @@ def test_empty_key_is_rejected(value_manager) -> None:
         value_manager.multi_value_key("")
 
 
-def test_get_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_get_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test get operation when DBAPIError occurs; expect StorageError."""
     with patch.object(
         db_connection,
@@ -138,9 +131,7 @@ def test_get_raises_storage_error_on_dbapi_error(
             value_manager.get("color")
 
 
-def test_get_keys_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_get_keys_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test get_keys operation when DBAPIError occurs; expect StorageError."""
     with patch.object(
         db_connection,
@@ -151,9 +142,7 @@ def test_get_keys_raises_storage_error_on_dbapi_error(
             value_manager.get_keys()
 
 
-def test_set_raises_storage_error_on_dbapi_error(
-    value_manager, db_connection
-) -> None:
+def test_set_raises_storage_error_on_dbapi_error(value_manager, db_connection) -> None:
     """Test set operation when DBAPIError occurs; expect StorageError."""
     with patch.object(
         db_connection,

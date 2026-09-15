@@ -33,9 +33,7 @@ def test_setup_creates_default_table_and_version_row(db_connection) -> None:
     table = get_value_table()
     assert table.name == "sa_values"
     assert "sa_values" in inspect(db_connection).get_table_names()
-    assert db_connection.execute(
-        select(table.c.name, table.c.value)
-    ).all() == [("", "1")]
+    assert db_connection.execute(select(table.c.name, table.c.value)).all() == [("", "1".encode())]
 
 
 def test_setup_is_idempotent_and_preserves_values(db_connection) -> None:
@@ -64,9 +62,7 @@ def test_setup_rejects_an_incompatible_table_version(db_connection) -> None:
     """Test setup with an existing version row changed to 2; expect ValueError for the incompatible version."""
     setup_sa_values(db_connection)
     table = get_value_table()
-    db_connection.execute(
-        update(table).where(table.c.name == "").values(value="2")
-    )
+    db_connection.execute(update(table).where(table.c.name == "").values(value="2".encode()))
 
     with pytest.raises(ValueError, match="Invalid table version: 2"):
         setup_sa_values(db_connection)

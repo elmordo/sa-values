@@ -19,7 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from sqlalchemy import Integer, String
+from sqlalchemy import Integer, LargeBinary, String
 
 from sa_values import table as table_module
 
@@ -50,7 +50,7 @@ def test_value_table_has_expected_columns() -> None:
     assert not table.c.id.nullable
     assert isinstance(table.c.name.type, String)
     assert not table.c.name.nullable
-    assert isinstance(table.c.value.type, String)
+    assert isinstance(table.c.value.type, LargeBinary)
     assert not table.c.value.nullable
 
 
