@@ -21,10 +21,12 @@
 # SOFTWARE.
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 from sqlalchemy import Connection, delete, insert, select, Table, update
+from sqlalchemy.exc import DBAPIError
 
+from .exceptions import StorageError
 from .table import get_value_table
 
 
@@ -54,16 +56,18 @@ class SaValues:
             .order_by(self._value_table.c.id)
             .limit(1)
         )
-        return self.connection.scalar(stmt)
+        try:
+            return self.connection.scalar(stmt)
+        except DBAPIError as err:
+            raise StorageError(f"Cannot get value of '{key}'") from err
 
     def get_keys(self) -> list[str]:
         """Return all keys."""
-        stmt = (
-            select(self._value_table.c.name)
-            .distinct()
-            .order_by(self._value_table.c.name)
-        )
-        return list(self.connection.scalars(stmt))
+        stmt = select(self._value_table.c.name).distinct().order_by(self._value_table.c.name)
+        try:
+            return list(self.connection.scalars(stmt))
+        except DBAPIError as err:
+            raise StorageError("Cannot get keys") from err
 
     def set(self, key: str, value: str) -> None:
         """Store exactly one value for the key, replacing any existing values."""
@@ -74,23 +78,26 @@ class SaValues:
             .where(self._value_table.c.name == key)
             .order_by(self._value_table.c.id)
         )
-        item_ids = list(self.connection.scalars(stmt))
-        if item_ids:
-            self.connection.execute(
-                update(self._value_table)
-                .where(self._value_table.c.id == item_ids[0])
-                .values(value=value),
-            )
-            if len(item_ids) > 1:
+        try:
+            item_ids = list(self.connection.scalars(stmt))
+            if item_ids:
                 self.connection.execute(
-                    delete(self._value_table).where(
-                        self._value_table.c.id.in_(item_ids[1:])
-                    ),
+                    update(self._value_table)
+                    .where(self._value_table.c.id == item_ids[0])
+                    .values(value=value),
                 )
-        else:
-            self.connection.execute(
-                insert(self._value_table).values(name=key, value=value)
-            )
+                if len(item_ids) > 1:
+                    self.connection.execute(
+                        delete(self._value_table).where(
+                            self._value_table.c.id.in_(item_ids[1:]),
+                        ),
+                    )
+            else:
+                self.connection.execute(
+                    insert(self._value_table).values(name=key, value=value),
+                )
+        except DBAPIError as err:
+            raise StorageError(f"Cannot set value of '{key}'") from err
 
     def has(self, key: str) -> bool:
         """Return whether the key has any stored values."""
@@ -137,7 +144,10 @@ class MultiValueKey:
             .where(self._value_table.c.name == self.key)
             .order_by(self._value_table.c.id)
         )
-        return list(dict.fromkeys(self.connection.scalars(stmt)))
+        try:
+            return list(dict.fromkeys(self.connection.scalars(stmt)))
+        except DBAPIError as err:
+            raise StorageError(f"Cannot get all values of '{self.key}'") from err
 
     def get(self, value: str) -> str | None:
         """Return the matching string, or None if it is absent."""
@@ -149,7 +159,10 @@ class MultiValueKey:
             )
             .limit(1)
         )
-        return self.connection.scalar(stmt)
+        try:
+            return self.connection.scalar(stmt)
+        except DBAPIError as err:
+            raise StorageError(f"Cannot get value of '{self.key}'") from err
 
     def has(self, value: str) -> bool:
         """Return whether this key contains the value."""
@@ -158,21 +171,30 @@ class MultiValueKey:
     def add(self, value: str) -> None:
         """Add the value if absent, leaving other values intact."""
         if not self.has(value):
-            self.connection.execute(
-                insert(self._value_table).values(name=self.key, value=value)
-            )
+            try:
+                self.connection.execute(
+                    insert(self._value_table).values(name=self.key, value=value),
+                )
+            except DBAPIError as err:
+                raise StorageError(f"Cannot add value to '{self.key}'") from err
 
     def delete(self, value: str) -> None:
         """Remove every matching row; missing values are ignored."""
-        self.connection.execute(
-            delete(self._value_table).where(
-                self._value_table.c.name == self.key,
-                self._value_table.c.value == value,
-            ),
-        )
+        try:
+            self.connection.execute(
+                delete(self._value_table).where(
+                    self._value_table.c.name == self.key,
+                    self._value_table.c.value == value,
+                ),
+            )
+        except DBAPIError as err:
+            raise StorageError(f"Cannot delete value of '{self.key}'") from err
 
     def clear(self) -> None:
         """Remove all values for this key; missing keys are ignored."""
-        self.connection.execute(
-            delete(self._value_table).where(self._value_table.c.name == self.key)
-        )
+        try:
+            self.connection.execute(
+                delete(self._value_table).where(self._value_table.c.name == self.key),
+            )
+        except DBAPIError as err:
+            raise StorageError(f"Cannot clear values of '{self.key}'") from err

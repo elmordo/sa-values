@@ -25,7 +25,7 @@ class SaValueException(Exception):
     """Common base for all exceptions raised by the `sa_values` lib."""
 
 
-class ConfigurationError(SaValueException):
+class ConfigurationError(SaValueException, ValueError):
     """Raised when configuration is invalid."""
 
 

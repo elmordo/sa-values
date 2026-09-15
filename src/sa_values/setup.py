@@ -102,5 +102,5 @@ def _execute_ddl_statement(connection: Connection, stmt: Executable) -> None:
     """
     try:
         connection.execute(stmt)
-    except DBAPIError:
-        raise StorageError from DBAPIError
+    except DBAPIError as err:
+        raise StorageError from err
