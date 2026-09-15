@@ -25,6 +25,10 @@ class SaValueException(Exception):
     """Common base for all exceptions raised by the `sa_values` lib."""
 
 
+class ConfigurationError(SaValueException):
+    """Raised when configuration is invalid."""
+
+
 class InvalidKeyError(SaValueException, KeyError):
     """Raised when an invalid key name is attempted to be stored"""
 
