@@ -26,19 +26,26 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.sql.ddl import CreateTable, DropTable
 
 from sa_values.table import setup_value_table
-from .exceptions import StorageError, DecodingError, ConfigurationError
+
+from .codecs import DataCodec, set_default_codec
+from .exceptions import ConfigurationError, DecodingError, StorageError
 from .table import get_value_table
 from .values import SaValues
+
 
 _TABLE_VERSION = 1
 
 
 def setup_sa_values(
-        connection: Connection, value_table_name: str | None = None,
+    connection: Connection,
+    value_table_name: str | None = None,
+    default_codec: DataCodec | None = None,
 ) -> None:
     """Prepare storage for the sa_values.
 
     The function is idempotent: multiple calls on the prepared database have no effect.
+
+    If no default codec is provided, the lib-default value is used (StringCodec).
 
     Raises:
         StorageError: Operation fails
@@ -46,6 +53,9 @@ def setup_sa_values(
     """
     if value_table_name is not None:
         setup_value_table(value_table_name)
+
+    if default_codec is not None:
+        set_default_codec(default_codec)
 
     _create_table(connection)
 
