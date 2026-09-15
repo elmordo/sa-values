@@ -19,7 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from sqlalchemy import Column, Integer, MetaData, String, Table
+from sqlalchemy import Column, Integer, LargeBinary, MetaData, String, Table
 
 
 _metadata = MetaData()
@@ -52,5 +52,5 @@ def _create_value_table(table_name: str = "sa_values") -> Table:
         _metadata,
         Column("id", Integer, primary_key=True),
         Column("name", String, nullable=False),
-        Column("value", String, nullable=False),
+        Column("value", LargeBinary, nullable=False),
     )
