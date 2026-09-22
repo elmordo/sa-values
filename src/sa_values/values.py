@@ -58,7 +58,7 @@ class SaValues:
         self._codec = codec
         self._allow_empty = False
 
-    def get(self, key: str, _type: T = object) -> T | None:
+    def get(self, key: str, _type: type[T] = object) -> T | None:
         """Return the oldest value by row ID, or None if the key is absent."""
         stmt = (
             select(self._value_table.c.value)
@@ -152,7 +152,7 @@ class MultiValueKey:
     def __iter__(self) -> Iterator[str]:
         return iter(self.get_all())
 
-    def get_all(self, _type: T = object) -> list[T]:
+    def get_all(self, _type: type[T] = object) -> list[T]:
         """Return distinct values in oldest-row order, or an empty list."""
         stmt = (
             select(self._value_table.c.value)
@@ -166,7 +166,7 @@ class MultiValueKey:
             raise StorageError(f"Cannot get all values of '{self.key}'") from err
         return [self._codec.decode(value, _type) for value in raw_values]
 
-    def get(self, value: str, _type: T = object) -> T | None:
+    def get(self, value: str, _type: type[T] = object) -> T | None:
         """Return the matching string, or None if it is absent."""
         stmt = (
             select(self._value_table.c.value)
